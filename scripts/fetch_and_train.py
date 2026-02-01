@@ -123,7 +123,7 @@ class PolygonDataFetcher:
 
 
 def save_to_database(df: pd.DataFrame, db_connection: str, table_name: str = 'market_data_minute'):
-    """Save data to database"""
+    """Save data to database using upsert to handle duplicates"""
     if df.empty:
         print("No data to save")
         return
@@ -155,17 +155,45 @@ def save_to_database(df: pd.DataFrame, db_connection: str, table_name: str = 'ma
         conn.execute(create_table_sql)
         conn.commit()
     
-    # Insert data
+    # Insert data with upsert logic (INSERT ... ON CONFLICT DO NOTHING)
     print(f"Saving {len(df)} records to database...")
+    
+    # Create a temporary table and copy data there first
+    temp_table = f"temp_{table_name}_{int(time.time())}"
     df.to_sql(
-        table_name,
+        temp_table,
         engine,
-        if_exists='append',
+        if_exists='replace',
         index=False,
         method='multi',
         chunksize=1000
     )
-    print("✅ Data saved to database")
+    
+    # Use INSERT ... ON CONFLICT to handle duplicates
+    upsert_sql = text(f"""
+        INSERT INTO {table_name} (symbol, timestamp, open, high, low, close, volume, vwap, transactions)
+        SELECT symbol, timestamp, open, high, low, close, volume, vwap, transactions
+        FROM {temp_table}
+        ON CONFLICT (symbol, timestamp) 
+        DO UPDATE SET
+            open = EXCLUDED.open,
+            high = EXCLUDED.high,
+            low = EXCLUDED.low,
+            close = EXCLUDED.close,
+            volume = EXCLUDED.volume,
+            vwap = EXCLUDED.vwap,
+            transactions = EXCLUDED.transactions
+    """)
+    
+    with engine.connect() as conn:
+        result = conn.execute(upsert_sql)
+        conn.commit()
+        
+        # Clean up temp table
+        conn.execute(text(f"DROP TABLE {temp_table}"))
+        conn.commit()
+    
+    print("✅ Data saved to database (duplicates handled)")
 
 
 def train_model_for_symbol(symbol: str, config: Config, days: int = 30):
@@ -269,7 +297,7 @@ def main():
     parser.add_argument(
         '--symbols',
         nargs='+',
-        help='Symbols to process (default: from config)'
+        help='Symbols to process (default: from symbols.txt)'
     )
     parser.add_argument(
         '--days',
@@ -289,8 +317,18 @@ def main():
     # Load configuration
     config = Config()
     
-    # Get symbols
-    symbols = args.symbols if args.symbols else config._config['symbols']
+    # Get symbols from symbols.txt file if not provided via command line
+    if args.symbols:
+        symbols = args.symbols
+    else:
+        symbols_file = Path(__file__).parent.parent / 'config' / 'symbols.txt'
+        if symbols_file.exists():
+            with open(symbols_file, 'r') as f:
+                symbols = [line.strip() for line in f if line.strip()]
+            print(f"Loaded {len(symbols)} symbols from symbols.txt")
+        else:
+            symbols = config._config['symbols']
+            print(f"symbols.txt not found, using config symbols")
     
     print(f"\n{'='*60}")
     print("📊 Polygon Data Fetch & Model Training")

@@ -1,0 +1,74 @@
+# LSTM Ensemble Trading System Configuration
+
+database:
+  connection_string: "${DB_CONNECTION}"
+  tables:
+    market_data: "market_data_minute"
+    predictions: "model_predictions"
+    signals: "trading_signals"
+
+polygon:
+  api_key: "${POLYGON_API_KEY}"
+  feed: "delayed"  # or "realtime"
+  batch_size: 100
+
+symbols:
+  - AAPL
+  - TSLA
+  - NVDA
+  - GOOGL
+  - MSFT
+
+models:
+  sequence_length: 60
+  prediction_horizon: 5
+  device: "${DEVICE:-cuda}"
+  
+training:
+  epochs: 50
+  batch_size: 64
+  learning_rate: 0.001
+  validation_split: 0.2
+  early_stopping_patience: 10
+
+inference:
+  interval_seconds: 60
+  enable_signals: true
+  min_confidence: 0.5
+
+features:
+  - returns
+  - log_returns
+  - high_low_pct
+  - close_open_pct
+  - rsi
+  - macd
+  - macd_signal
+  - macd_hist
+  - bb_position
+  - bb_width
+  - price_to_sma5
+  - price_to_sma20
+  - ema_diff
+  - relative_volume
+  - volume_change
+  - price_to_vwap
+  - volume_momentum
+  - money_flow_ratio
+  - volatility_10
+  - volatility_20
+  - normalized_atr
+  - hour_sin
+  - hour_cos
+  - minute_sin
+  - minute_cos
+  - is_market_open
+  - is_morning
+
+ensemble_weights:
+  lstm: 0.25
+  bilstm: 0.25
+  attention_lstm: 0.20
+  cnn_lstm: 0.15
+  lgbm: 0.10
+  xgb: 0.05

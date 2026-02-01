@@ -67,12 +67,23 @@ logs/
 *.sqlite3
 
 # Model files and checkpoints
-models/checkpoints/*.pth
-models/checkpoints/*.pt
-models/checkpoints/*.h5
-models/checkpoints/*.pkl
+models/
+models/**/*
+!models/.gitkeep
+models/checkpoints/
+*.pth
+*.pt
+*.h5
+*.pkl
 *.ckpt
 *.model
+*.weights
+*.pb
+*.onnx
+*.tflite
+*.mlmodel
+*.joblib
+*.sav
 
 # Data files (keep structure, ignore data)
 data/*.csv

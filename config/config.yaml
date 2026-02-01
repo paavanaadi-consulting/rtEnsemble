@@ -2,6 +2,9 @@
 
 database:
   connection_string: "${DB_CONNECTION}"
+  market_data_table: "market_data_minute"
+  predictions_table: "model_predictions"
+  signals_table: "trading_signals"
   tables:
     market_data: "market_data_minute"
     predictions: "model_predictions"

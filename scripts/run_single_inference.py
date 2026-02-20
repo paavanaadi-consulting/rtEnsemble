@@ -100,8 +100,13 @@ def run_inference_for_symbol(symbol: str):
     latest_timestamp = df['timestamp'].iloc[-1]
     
     # Calculate confidence metrics
-    confidence = abs(ensemble_prediction) * 100
-    signal_strength = 'STRONG' if confidence > 0.7 else 'MODERATE' if confidence > 0.3 else 'WEAK'
+    model_preds = list(individual_predictions.values())
+    pred_std = np.std(model_preds) if len(model_preds) > 1 else 0
+    pred_mean = np.mean(model_preds) if model_preds else 0
+    agreement = max(0, 1 - (pred_std / (abs(pred_mean) + 1e-10)))
+    magnitude = min(abs(ensemble_prediction) * 100, 1.0)
+    confidence = min(0.5 * agreement + 0.5 * magnitude, 1.0)
+    signal_strength_label = 'STRONG' if confidence > 0.7 else 'MODERATE' if confidence > 0.3 else 'WEAK'
     
     print(f"\n{'='*60}")
     print(f"📊 PREDICTION RESULTS for {symbol}")
@@ -110,8 +115,8 @@ def run_inference_for_symbol(symbol: str):
     print(f"Latest Time:  {latest_timestamp}")
     print(f"Ensemble Pred: {ensemble_prediction:.6f}")
     print(f"Direction:    {'📈 UP' if ensemble_prediction > 0 else '📉 DOWN'}")
-    print(f"Confidence:   {confidence:.2f}%")
-    print(f"Strength:     {signal_strength}")
+    print(f"Confidence:   {confidence:.2%}")
+    print(f"Strength:     {signal_strength_label}")
     print(f"\nIndividual Model Predictions:")
     for model_name, pred in individual_predictions.items():
         print(f"  {model_name:15s}: {pred:.6f}")
@@ -122,8 +127,8 @@ def run_inference_for_symbol(symbol: str):
     
     # Calculate additional metrics
     predicted_price = latest_price * (1 + ensemble_prediction)
-    signal = 'BUY' if ensemble_prediction > 0.005 else 'SELL' if ensemble_prediction < -0.005 else 'HOLD'
-    model_agreement = np.std([v for v in individual_predictions.values()])  # Lower = better agreement
+    signal = 'BUY' if ensemble_prediction > 0.002 else 'SELL' if ensemble_prediction < -0.002 else 'HOLD'
+    model_agreement = agreement
     
     upsert_query = text("""
         INSERT INTO lstm_ensemble_output (

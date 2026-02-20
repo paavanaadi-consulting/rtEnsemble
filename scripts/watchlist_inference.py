@@ -89,7 +89,7 @@ class WatchlistDataReader:
             start_time = timestamp - timedelta(minutes=lookback_minutes)
             
             query = text("""
-                SELECT 
+                SELECT
                     symbol,
                     timestamp,
                     open,
@@ -99,7 +99,7 @@ class WatchlistDataReader:
                     volume,
                     vwap,
                     transactions
-                FROM public.watchlist_alerts
+                FROM public.market_data_minute
                 WHERE symbol = :symbol
                     AND timestamp >= :start_time
                     AND timestamp <= :end_time
@@ -323,19 +323,18 @@ class WatchlistInferenceEngine:
         try:
             # Compute features
             df_features = FeatureEngineering.compute_all_features(historical_df)
-            
+            df_features = df_features.dropna()
+
             # Get current price from historical data (most recent close)
             current_price = float(historical_df['close'].iloc[-1])
             print(f"Current Price: ${current_price:.2f}")
-            
-            # Prepare data for prediction
-            features_scaled = ensemble.scaler.transform(
-                df_features[self.config.features].values
-            )
-            
-            # Get predictions
-            ensemble_pred = ensemble.predict_ensemble(features_scaled)
-            individual_preds = ensemble.predict(features_scaled)
+
+            # Get raw feature values - the ensemble.predict handles scaling
+            feature_values = df_features[self.config.features].values
+
+            # Get predictions (predict handles scaling internally)
+            ensemble_pred = ensemble.predict_ensemble(feature_values)
+            individual_preds = ensemble.predict(feature_values)
             
             # Calculate metrics
             model_preds = list(individual_preds.values())
